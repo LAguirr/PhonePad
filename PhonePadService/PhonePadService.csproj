@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <ApplicationIcon>assets\PhonePad.ico</ApplicationIcon>
+    <AssemblyName>PhonePad</AssemblyName>
+    <Product>PhonePad</Product>
+    <Company>PhonePad</Company>
+    <Description>Use your Android phone as a wireless Bluetooth mouse</Description>
+    <Version>1.0.0</Version>
+    <FileVersion>1.0.0.0</FileVersion>
+    <Copyright>2026 PhonePad</Copyright>
+  </PropertyGroup>
+
+</Project>

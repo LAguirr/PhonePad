@@ -1,0 +1,17 @@
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\PhonePadService.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\PhonePadService.AssemblyInfoInputs.cache
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\PhonePadService.AssemblyInfo.cs
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\PhonePadService.csproj.CoreCompileInputs.cache
+C:\Users\lino_\proyects\PhonePad\PhonePadService\bin\Debug\net8.0-windows10.0.19041.0\PhonePad.exe
+C:\Users\lino_\proyects\PhonePad\PhonePadService\bin\Debug\net8.0-windows10.0.19041.0\PhonePad.deps.json
+C:\Users\lino_\proyects\PhonePad\PhonePadService\bin\Debug\net8.0-windows10.0.19041.0\PhonePad.runtimeconfig.json
+C:\Users\lino_\proyects\PhonePad\PhonePadService\bin\Debug\net8.0-windows10.0.19041.0\PhonePad.dll
+C:\Users\lino_\proyects\PhonePad\PhonePadService\bin\Debug\net8.0-windows10.0.19041.0\PhonePad.pdb
+C:\Users\lino_\proyects\PhonePad\PhonePadService\bin\Debug\net8.0-windows10.0.19041.0\Microsoft.Windows.SDK.NET.dll
+C:\Users\lino_\proyects\PhonePad\PhonePadService\bin\Debug\net8.0-windows10.0.19041.0\WinRT.Runtime.dll
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\PhonePad.6C4BDAEF.Up2Date
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\PhonePad.dll
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\refint\PhonePad.dll
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\PhonePad.pdb
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\PhonePadService.genruntimeconfig.cache
+C:\Users\lino_\proyects\PhonePad\PhonePadService\obj\Debug\net8.0-windows10.0.19041.0\ref\PhonePad.dll
