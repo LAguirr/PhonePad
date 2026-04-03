@@ -4,26 +4,27 @@ import android.Manifest
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothManager
 import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectDragGestures
-import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerInputChange
+import androidx.compose.ui.input.pointer.changedToUp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.withTimeoutOrNull
 
 class MainActivity : ComponentActivity() {
 
@@ -44,11 +45,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        
+
         bleClient = BleMouseClient(this, onReady = {
             runOnUiThread { isReady = true }
-        }, onConnectionChange = { defaultName ->
-            runOnUiThread { connectedDeviceName = defaultName }
+        }, onConnectionChange = { name ->
+            runOnUiThread { connectedDeviceName = name }
         })
 
         checkAndRequestPermissions()
@@ -64,7 +65,14 @@ class MainActivity : ComponentActivity() {
                     } else if (!isReady) {
                         DeviceSelectionScreen(bleClient, connectedDeviceName)
                     } else {
-                        TouchpadArea(bleClient, connectedDeviceName, this)
+                        TouchpadArea(
+                            hidService = bleClient,
+                            connectedDeviceName = connectedDeviceName,
+                            onDisconnect = {
+                                bleClient.disconnect()
+                                isReady = false
+                            }
+                        )
                     }
                 }
             }
@@ -94,9 +102,8 @@ class MainActivity : ComponentActivity() {
     private fun setupBluetooth() {
         val bm = getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
         if (bm.adapter?.isEnabled == false) {
-            // Wait or prompt user to enable Bluetooth
             return
-        } 
+        }
     }
 }
 
@@ -113,7 +120,7 @@ fun DeviceSelectionScreen(bleClient: BleMouseClient, status: String?) {
     Column(modifier = Modifier.fillMaxSize().padding(16.dp)) {
         Text("Paired Devices", style = MaterialTheme.typography.headlineMedium)
         Spacer(modifier = Modifier.height(16.dp))
-        
+
         devices.forEach { device ->
             @SuppressLint("MissingPermission")
             val name = device.name ?: "Unknown Device"
@@ -125,7 +132,7 @@ fun DeviceSelectionScreen(bleClient: BleMouseClient, status: String?) {
             }
             Spacer(modifier = Modifier.height(8.dp))
         }
-        
+
         Spacer(modifier = Modifier.height(24.dp))
         if (status != null) {
             Text(text = "Status: $status", color = Color.Yellow)
@@ -134,8 +141,11 @@ fun DeviceSelectionScreen(bleClient: BleMouseClient, status: String?) {
 }
 
 @Composable
-fun TouchpadArea(hidService: BleMouseClient, connectedDeviceName: String?, context: Context) {
-    
+fun TouchpadArea(
+    hidService: BleMouseClient,
+    connectedDeviceName: String?,
+    onDisconnect: () -> Unit
+) {
     val connectionText = if (connectedDeviceName != null) {
         "Connected to $connectedDeviceName\nReady to use"
     } else {
@@ -147,6 +157,7 @@ fun TouchpadArea(hidService: BleMouseClient, connectedDeviceName: String?, conte
             .fillMaxSize()
             .background(Color(0xFF1E1E1E))
     ) {
+        // Top bar
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -160,43 +171,135 @@ fun TouchpadArea(hidService: BleMouseClient, connectedDeviceName: String?, conte
                 textAlign = TextAlign.Center,
                 modifier = Modifier.weight(1f)
             )
-            Row {
-                Button(onClick = { hidService.disconnect() }) {
-                    Text("Disconnect")
-                }
+            Button(onClick = onDisconnect) {
+                Text("Disconnect")
             }
         }
 
+        // Touchpad surface — handles all gestures
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .weight(1f)
+                // ── Gesture 1: single-finger drag → mouse move
+                //    Gesture 2: double-tap-and-hold → pick/drag
                 .pointerInput(Unit) {
-                    detectDragGestures(
-                        onDragStart = { },
-                        onDragEnd = { hidService.sendLeftUp() },
-                        onDragCancel = { hidService.sendLeftUp() },
-                        onDrag = { change, dragAmount ->
-                            change.consume()
-                            val sensitivity = 1.3f
-                            hidService.sendMouseMove(
-                                (dragAmount.x * sensitivity).toInt(),
-                                (dragAmount.y * sensitivity).toInt()
-                            )
+                    val doubleTapTimeoutMs = 300L
+
+                    awaitEachGesture {
+                        // ── Phase 1: first finger down
+                        val firstDown = awaitFirstDown(requireUnconsumed = false)
+
+                        var isDragging = false
+
+                        // ── Phase 2: track first finger until it lifts (or drag starts)
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pointer = event.changes.firstOrNull { it.id == firstDown.id }
+                                ?: break
+
+                            if (pointer.changedToUp()) {
+                                pointer.consume()
+                                break
+                            }
+
+                            val drag = pointer.position - pointer.previousPosition
+                            if (drag.x != 0f || drag.y != 0f) {
+                                isDragging = true
+                                val sensitivity = 1.3f
+                                hidService.sendMouseMove(
+                                    (drag.x * sensitivity).toInt(),
+                                    (drag.y * sensitivity).toInt()
+                                )
+                                pointer.consume()
+                            }
                         }
-                    )
+
+                        if (!isDragging) {
+                            // ── Phase 3: first tap lifted — wait for second tap with timeout
+                            val secondDown: PointerInputChange? = withTimeoutOrNull(doubleTapTimeoutMs) {
+                                var found: PointerInputChange? = null
+                                while (found == null) {
+                                    val event = awaitPointerEvent()
+                                    found = event.changes.firstOrNull { !it.previousPressed && it.pressed }
+                                    found?.consume()
+                                }
+                                found
+                            }
+
+                            if (secondDown != null) {
+                                // ── Double-tap-and-hold: pick/drag gesture
+                                hidService.sendLeftDown()
+                                try {
+                                    while (true) {
+                                        val event = awaitPointerEvent()
+                                        val pointer = event.changes.firstOrNull { it.id == secondDown.id }
+                                            ?: break
+                                        if (pointer.changedToUp()) {
+                                            pointer.consume()
+                                            break
+                                        }
+                                        val drag = pointer.position - pointer.previousPosition
+                                        if (drag.x != 0f || drag.y != 0f) {
+                                            val sensitivity = 1.3f
+                                            hidService.sendMouseMove(
+                                                (drag.x * sensitivity).toInt(),
+                                                (drag.y * sensitivity).toInt()
+                                            )
+                                            pointer.consume()
+                                        }
+                                    }
+                                } finally {
+                                    hidService.sendLeftUp()
+                                }
+                            } else {
+                                // ── Single tap → left click
+                                hidService.sendClick(left = true)
+                            }
+                        }
+                        // If isDragging, move events were already sent above
+                    }
                 }
+                // ── Gesture 3: two-finger scroll
                 .pointerInput(Unit) {
-                    detectTapGestures(
-                        onTap = { hidService.sendClick(left = true) },
-                        onDoubleTap = { },
-                        onLongPress = { hidService.sendClick(right = true) },
-                        onPress = { }
-                    )
+                    awaitEachGesture {
+                        // Wait until we see at least 2 fingers
+                        awaitFirstDown(requireUnconsumed = false)
+
+                        var scrollAccum = 0f
+                        val scrollThreshold = 8f  // pixels per scroll tick
+
+                        while (true) {
+                            val event = awaitPointerEvent()
+                            val pointers = event.changes.filter { it.pressed }
+
+                            if (pointers.size >= 2) {
+                                // Average Y movement of all active fingers
+                                val avgDy = pointers.map {
+                                    it.position.y - it.previousPosition.y
+                                }.average().toFloat()
+
+                                scrollAccum += avgDy
+                                // Consume to prevent single-finger handler interfering
+                                pointers.forEach { it.consume() }
+
+                                while (scrollAccum > scrollThreshold) {
+                                    hidService.sendScroll(3)    // scroll up
+                                    scrollAccum -= scrollThreshold
+                                }
+                                while (scrollAccum < -scrollThreshold) {
+                                    hidService.sendScroll(-3)   // scroll down
+                                    scrollAccum += scrollThreshold
+                                }
+                            }
+
+                            if (pointers.isEmpty()) break
+                        }
+                    }
                 }
         ) {
             Text(
-                text = "Drag to Move\nTap to Left-Click\nLong Press to Right-Click",
+                text = "Drag to Move\nTap to Click\nDouble-tap & Hold to Drag\nTwo Fingers to Scroll",
                 color = Color.DarkGray,
                 modifier = Modifier.align(Alignment.Center),
                 textAlign = TextAlign.Center,
